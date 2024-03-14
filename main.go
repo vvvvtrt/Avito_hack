@@ -33,27 +33,89 @@ func load_data(data ReadAPI) WriteAPI {
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT price, where_price FROM microcategory WHERE id = ?", data.Location_id)
+	rows, err := db.Query("SELECT price, where_price FROM microcategory WHERE id = ?", data.Microcategory_id)
 	if err != nil {
 		panic(err.Error())
 	}
 	defer rows.Close()
 
-	new_data := WriteAPI{Price: 10000, Location_id: 1, Microcategory_id: 1, Matrix_id: 2, User_segment_id: 213}
+	new_data := WriteAPI{Price: 0, Location_id: 2, Microcategory_id: 2, Matrix_id: 2, User_segment_id: 213}
+
+	var price int
+	var where_price int
 	for rows.Next() {
-		err := rows.Scan(&new_data.Price, &new_data.Location_id)
+		err := rows.Scan(&price, &where_price)
 		if err != nil {
 			panic(err.Error())
 		}
 	}
 
-	rows, err := db.Query("SELECT price, where_price FROM location WHERE id = ?", data.Location_id)
+	if where_price != data.Microcategory_id {
+		rows3, err := db.Query("SELECT price, where_price FROM microcategory WHERE id = ?", where_price)
+		if err != nil {
+			panic(err.Error())
+		}
+		defer rows3.Close()
+
+		for rows3.Next() {
+			err := rows3.Scan(&price, &where_price)
+			if err != nil {
+				panic(err.Error())
+			}
+		}
+	}
+
+	new_data.Microcategory_id = where_price
+	new_data.Price = price
+
+	rows2, err := db.Query("SELECT price, where_price FROM location WHERE id = ?", data.Location_id)
 	if err != nil {
 		panic(err.Error())
 	}
-	defer rows.Close()
+	defer rows2.Close()
+
+	for rows2.Next() {
+		err := rows2.Scan(&price, &where_price)
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+
+	if where_price != data.Microcategory_id {
+		rows4, err := db.Query("SELECT price, where_price FROM location WHERE id = ?", where_price)
+		if err != nil {
+			panic(err.Error())
+		}
+		defer rows4.Close()
+
+		for rows4.Next() {
+			err := rows4.Scan(&price, &where_price)
+			if err != nil {
+				panic(err.Error())
+			}
+		}
+	}
+
+	new_data.Price = new_data.Price + price
+	new_data.Location_id = where_price
 
 	return new_data
+}
+
+type Country struct {
+	Country_ string `json:"country"`
+	ID       string `json:"id"`
+}
+
+func country(w http.ResponseWriter, r *http.Request) {
+	country_ := Country{Country_: "[Россия]", ID: "[1]"}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(country_)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -88,5 +150,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	http.HandleFunc("/api/", handler)
+	http.HandleFunc("/country/", country)
 	http.ListenAndServe(":8080", nil)
 }
